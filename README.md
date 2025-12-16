@@ -143,5 +143,9 @@ Future enhancements could include:
 
 A short screen recording (≤30s) is included in the submission to demonstrate real-time interaction and smooth motion.
 
+
+https://github.com/user-attachments/assets/43d287c3-7499-407d-999f-e351609d2ee1
+
+
 ---
 
