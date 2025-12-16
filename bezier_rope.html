@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Interactive Bézier Rope</title>
+<style>
+  html, body {
+    margin: 0;
+    background: #0f0f0f;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<script>
+// ======================================================
+// Canvas Setup
+// ======================================================
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ======================================================
+// Vector Math
+// ======================================================
+class Vec2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+
+  add(v) { return new Vec2(this.x + v.x, this.y + v.y); }
+  sub(v) { return new Vec2(this.x - v.x, this.y - v.y); }
+  mul(s) { return new Vec2(this.x * s, this.y * s); }
+
+  length() {
+    return Math.hypot(this.x, this.y);
+  }
+
+  normalize() {
+    const len = this.length();
+    return len === 0 ? new Vec2() : this.mul(1 / len);
+  }
+}
+
+// ======================================================
+// Bézier Math
+// ======================================================
+function cubicBezier(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  const tt = t * t;
+  const uu = u * u;
+
+  return p0.mul(uu * u)
+    .add(p1.mul(3 * uu * t))
+    .add(p2.mul(3 * u * tt))
+    .add(p3.mul(tt * t));
+}
+
+function cubicBezierTangent(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  return p1.sub(p0).mul(3 * u * u)
+    .add(p2.sub(p1).mul(6 * u * t))
+    .add(p3.sub(p2).mul(3 * t * t));
+}
+
+// ======================================================
+// Control Points
+// ======================================================
+const p0 = new Vec2();
+const p3 = new Vec2();
+
+const p1 = new Vec2();
+const p2 = new Vec2();
+
+const v1 = new Vec2();
+const v2 = new Vec2();
+
+function resetPoints() {
+  const midY = canvas.height * 0.5;
+  p0.x = canvas.width * 0.1;
+  p0.y = midY;
+
+  p3.x = canvas.width * 0.9;
+  p3.y = midY;
+
+  p1.x = canvas.width * 0.35;
+  p1.y = midY;
+
+  p2.x = canvas.width * 0.65;
+  p2.y = midY;
+}
+resetPoints();
+
+// ======================================================
+// Spring Physics
+// ======================================================
+const SPRING_K = 12.0;      // stiffness
+const DAMPING = 0.85;      // damping factor
+
+function spring(point, velocity, target, dt) {
+  const force = target.sub(point).mul(SPRING_K);
+  velocity.x += force.x * dt;
+  velocity.y += force.y * dt;
+
+  velocity.x *= DAMPING;
+  velocity.y *= DAMPING;
+
+  point.x += velocity.x * dt;
+  point.y += velocity.y * dt;
+}
+
+// ======================================================
+// Input (Mouse)
+// ======================================================
+const target = new Vec2(canvas.width / 2, canvas.height / 2);
+
+canvas.addEventListener("mousemove", e => {
+  const r = canvas.getBoundingClientRect();
+  target.x = e.clientX - r.left;
+  target.y = e.clientY - r.top;
+});
+
+// ======================================================
+// Rendering Helpers
+// ======================================================
+function drawPoint(p, color) {
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawBezier() {
+  ctx.beginPath();
+  for (let t = 0; t <= 1.001; t += 0.01) {
+    const p = cubicBezier(t, p0, p1, p2, p3);
+    if (t === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  }
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawTangents() {
+  ctx.strokeStyle = "#ffaa00";
+  ctx.lineWidth = 1;
+
+  for (let t = 0; t <= 1; t += 0.1) {
+    const p = cubicBezier(t, p0, p1, p2, p3);
+    const tan = cubicBezierTangent(t, p0, p1, p2, p3)
+      .normalize()
+      .mul(30);
+
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + tan.x, p.y + tan.y);
+    ctx.stroke();
+  }
+}
+
+// ======================================================
+// Animation Loop
+// ======================================================
+let lastTime = performance.now();
+
+function animate(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.02);
+  lastTime = time;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  spring(p1, v1, target, dt);
+  spring(p2, v2, target, dt);
+
+  drawBezier();
+  drawTangents();
+
+  drawPoint(p0, "#ffffff");
+  drawPoint(p1, "#ff4444");
+  drawPoint(p2, "#ff4444");
+  drawPoint(p3, "#ffffff");
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+
+</body>
+</html>
